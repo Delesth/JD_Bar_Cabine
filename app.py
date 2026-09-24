@@ -7,8 +7,8 @@ import streamlit as st
 st.set_page_config(page_title="Bar & Cabine", page_icon="🥤", layout="centered")
 
 from core import auth  # noqa: E402
-from vues import (achats, historique, parametres, produits, stock,  # noqa: E402
-                  tableau_bord, validations, ventes)
+from vues import (achats, cabine, depenses, historique, parametres,  # noqa: E402
+                  produits, stock, tableau_bord, tresorerie, validations, ventes)
 
 utilisateur = auth.exiger_connexion()
 
@@ -18,13 +18,20 @@ if auth.est_proprietaire():
         "Pilotage": [
             st.Page(tableau_bord.page, title="Tableau de bord", icon="📊", url_path="tableau-de-bord", default=True),
             st.Page(validations.page, title=f"À valider ({n})" if n else "À valider", icon="⚠️", url_path="a-valider"),
+            st.Page(tresorerie.page, title="Trésorerie", icon="💰", url_path="tresorerie"),
             st.Page(historique.page, title="Historique", icon="🗂️", url_path="historique"),
         ],
         "Saisie · Bar": [
             st.Page(ventes.page, title="Ventes du jour", icon="🧾", url_path="ventes"),
             st.Page(achats.page, title="Nouvel achat", icon="📦", url_path="achats"),
-            st.Page(stock.page, title="Stock", icon="🍺", url_path="stock"),
+            st.Page(stock.page, title="Stock boissons", icon="🍺", url_path="stock"),
             st.Page(produits.page, title="Produits", icon="🏷️", url_path="produits"),
+        ],
+        "Saisie · Cabine": [
+            st.Page(cabine.page, title="Cabine du jour", icon="📱", url_path="cabine"),
+        ],
+        "Saisie · Caisse": [
+            st.Page(depenses.page, title="Dépenses", icon="🧮", url_path="depenses"),
         ],
         "Compte": [st.Page(parametres.page, title="Paramètres", icon="⚙️", url_path="parametres")],
     }
@@ -33,8 +40,14 @@ else:
         "Saisie · Bar": [
             st.Page(ventes.page, title="Ventes du jour", icon="🧾", url_path="ventes", default=True),
             st.Page(achats.page, title="Nouvel achat", icon="📦", url_path="achats"),
-            st.Page(stock.page, title="Stock", icon="🍺", url_path="stock"),
+            st.Page(stock.page, title="Stock boissons", icon="🍺", url_path="stock"),
             st.Page(produits.page, title="Produits", icon="🏷️", url_path="produits"),
+        ],
+        "Saisie · Cabine": [
+            st.Page(cabine.page, title="Cabine du jour", icon="📱", url_path="cabine"),
+        ],
+        "Saisie · Caisse": [
+            st.Page(depenses.page, title="Dépenses", icon="🧮", url_path="depenses"),
         ],
     }
 

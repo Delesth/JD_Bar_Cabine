@@ -2,8 +2,8 @@
 import pandas as pd
 import streamlit as st
 
-from core.calculs import charger, rejouer
-from core.db import Achat, AjustementStock, Session, Vente
+from core.calculs import COMPTES, OPERATEURS, TYPES_CABINE, charger, rejouer
+from core.db import Achat, AjustementStock, MouvementTresorerie, OperationCabine, Session, Vente
 from core.format import afficher_flash, date_fr, fcfa, flash, nombre, pluriel
 
 STATUTS = {"validee": "Validée", "en_attente": "En attente", "refusee": "Refusée"}
@@ -35,7 +35,7 @@ def page():
     d = charger()
     r = rejouer(d)
     nomp = lambda pid: d.produit(pid).nom if d.produit(pid) else "?"
-    t1, t2, t3 = st.tabs(["Ventes", "Achats", "Comptages"])
+    t1, t2, t3, t4, t5 = st.tabs(["Ventes", "Achats", "Comptages", "Cabine", "Trésorerie"])
 
     with t1:
         ventes = sorted(d.ventes, key=lambda v: (v.date, v.id), reverse=True)
@@ -89,3 +89,36 @@ def page():
             _suppression("un comptage", AjustementStock,
                          [(j.id, f"{date_fr(j.date)} · {nomp(j.produit_id)} · écart {nombre(j.ecart)}")
                           for j in ajs], "j")
+
+    with t4:
+        ops = sorted(d.operations, key=lambda o: (o.date, o.id), reverse=True)
+        if not ops:
+            st.caption("Aucune opération de cabine.")
+        else:
+            df = pd.DataFrame([{
+                "Date": date_fr(o.date), "Réseau": OPERATEURS.get(o.operateur, o.operateur),
+                "Opération": TYPES_CABINE.get(o.type, o.type), "Montant": round(o.montant),
+                "Commission": round(o.commission), "Saisi par": d.utilisateurs.get(o.auteur_id, "?"),
+            } for o in ops])
+            st.dataframe(df, hide_index=True, width="stretch")
+            _csv(df, "cabine.csv")
+            _suppression("une opération de cabine", OperationCabine,
+                         [(o.id, f"{date_fr(o.date)} · {OPERATEURS.get(o.operateur)} · "
+                                 f"{TYPES_CABINE.get(o.type)} · commission {fcfa(o.commission)}") for o in ops], "o")
+    with t5:
+        mv = sorted(d.mouvements, key=lambda m: (m.date, m.id), reverse=True)
+        noms = {"apport": "Apport", "depense": "Dépense", "decaissement": "Décaissement",
+                "reevaluation": "Réévaluation", "transfert": "Transfert interne"}
+        if not mv:
+            st.caption("Aucun mouvement de trésorerie.")
+        else:
+            df = pd.DataFrame([{
+                "Date": date_fr(m.date), "Type": noms.get(m.type, m.type),
+                "De": COMPTES.get(m.compte_source, ""), "Vers": COMPTES.get(m.compte_dest, ""),
+                "Montant": round(m.montant), "Catégorie": m.categorie or "", "Détail": m.libelle or "",
+                "Saisi par": d.utilisateurs.get(m.auteur_id, "?"),
+            } for m in mv])
+            st.dataframe(df, hide_index=True, width="stretch")
+            _csv(df, "tresorerie.csv")
+            _suppression("un mouvement", MouvementTresorerie,
+                         [(m.id, f"{date_fr(m.date)} · {noms.get(m.type)} · {fcfa(m.montant)}") for m in mv], "m")

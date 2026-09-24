@@ -9,7 +9,8 @@ from datetime import date
 
 from sqlalchemy import select
 
-from core.db import AjustementStock, Achat, Produit, Session, Utilisateur, Vente
+from core.db import (AjustementStock, Achat, MouvementTresorerie, OperationCabine, Produit,
+                     Session, Utilisateur, Vente)
 
 
 @dataclass
@@ -18,6 +19,8 @@ class Donnees:
     achats: list = field(default_factory=list)
     ventes: list = field(default_factory=list)
     ajustements: list = field(default_factory=list)
+    operations: list = field(default_factory=list)
+    mouvements: list = field(default_factory=list)
     utilisateurs: dict = field(default_factory=dict)
 
     def produit(self, pid):
@@ -31,6 +34,8 @@ def charger() -> Donnees:
             achats=list(s.scalars(select(Achat))),
             ventes=list(s.scalars(select(Vente))),
             ajustements=list(s.scalars(select(AjustementStock))),
+            operations=list(s.scalars(select(OperationCabine))),
+            mouvements=list(s.scalars(select(MouvementTresorerie))),
             utilisateurs={u.id: u.nom for u in s.scalars(select(Utilisateur))},
         )
 
@@ -138,3 +143,79 @@ def indicateurs(d: Donnees, r: Rejeu, debut: date | None, fin: date | None) -> I
         if dans(j.date):
             ind.pertes_stock += r.valeur_ajust.get(j.id, 0)
     return ind
+
+
+# ---------------------------------------------------------------- Cabine & trésorerie
+
+COMPTES = {
+    "caisse_bar": "Caisse bar",
+    "caisse_cabine": "Caisse cabine",
+    "capital_airtel": "Capital Airtel",
+    "capital_mtn": "Capital MTN",
+}
+OPERATEURS = {"airtel": "Airtel", "mtn": "MTN"}
+TYPES_CABINE = {"credit": "Crédit / recharge", "depot": "Dépôt", "retrait": "Retrait"}
+
+
+def soldes(d: Donnees) -> dict:
+    """Argent disponible sur chaque compte, à ce jour.
+
+    Caisse bar     = ventes encaissées − achats ± mouvements
+    Caisse cabine  = commissions ± mouvements
+    Capital réseau = apports ± réévaluations ± transferts
+    Toutes les ventes encaissées comptent, même en attente de validation :
+    l'argent est bien dans la caisse.
+    """
+    s = {k: 0.0 for k in COMPTES}
+    s["caisse_bar"] += sum(v.montant_encaisse for v in d.ventes)
+    s["caisse_bar"] -= sum(a.montant for a in d.achats)
+    s["caisse_cabine"] += sum(o.commission for o in d.operations)
+    for m in d.mouvements:
+        if m.compte_source in s:
+            s[m.compte_source] -= m.montant
+        if m.compte_dest in s:
+            s[m.compte_dest] += m.montant
+    return s
+
+
+def _dans(x, debut, fin):
+    return (debut is None or x >= debut) and (fin is None or x <= fin)
+
+
+@dataclass
+class IndicateursCabine:
+    commissions: dict = field(default_factory=lambda: {k: 0.0 for k in OPERATEURS})
+    volumes: dict = field(default_factory=lambda: {k: 0.0 for k in OPERATEURS})
+    detail: dict = field(default_factory=dict)  # (operateur, type) -> (volume, commission)
+    commissions_par_jour: dict = field(default_factory=dict)  # (jour, operateur) -> commission
+    depenses: float = 0
+
+    @property
+    def commission_totale(self):
+        return sum(self.commissions.values())
+
+    @property
+    def benefice(self):
+        return self.commission_totale - self.depenses
+
+
+def indicateurs_cabine(d: Donnees, debut, fin) -> IndicateursCabine:
+    ind = IndicateursCabine()
+    for o in d.operations:
+        if not _dans(o.date, debut, fin):
+            continue
+        ind.commissions[o.operateur] = ind.commissions.get(o.operateur, 0) + o.commission
+        ind.volumes[o.operateur] = ind.volumes.get(o.operateur, 0) + o.montant
+        v, c = ind.detail.get((o.operateur, o.type), (0, 0))
+        ind.detail[(o.operateur, o.type)] = (v + o.montant, c + o.commission)
+        cle = (o.date, o.operateur)
+        ind.commissions_par_jour[cle] = ind.commissions_par_jour.get(cle, 0) + o.commission
+    ind.depenses = total_mouvements(d, "depense", debut, fin, source="caisse_cabine")
+    return ind
+
+
+def total_mouvements(d: Donnees, type_: str, debut, fin, source=None, dest=None) -> float:
+    return sum(m.montant for m in d.mouvements
+               if m.type == type_ and _dans(m.date, debut, fin)
+               and (source is None or m.compte_source == source)
+               and (dest is None or m.compte_dest == dest))

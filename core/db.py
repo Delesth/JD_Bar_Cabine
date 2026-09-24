@@ -114,6 +114,40 @@ class AjustementStock(Base):
         return self.quantite_comptee - self.quantite_theorique
 
 
+class OperationCabine(Base):
+    """Totaux du jour pour un réseau et un type d'opération (une ligne par jour/réseau/type)."""
+    __tablename__ = "operations_cabine"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    date: Mapped[date] = mapped_column(Date)
+    operateur: Mapped[str] = mapped_column(String(20))  # airtel | mtn
+    type: Mapped[str] = mapped_column(String(20))  # credit | depot | retrait
+    montant: Mapped[float] = mapped_column(Float, default=0)  # volume (argent des clients)
+    commission: Mapped[float] = mapped_column(Float, default=0)  # revenu de la cabine
+    auteur_id: Mapped[int] = mapped_column(ForeignKey("utilisateurs.id"))
+    cree_le: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+
+
+class MouvementTresorerie(Base):
+    """Mouvement d'argent entre les « comptes » de l'activité.
+
+    Comptes : caisse_bar, caisse_cabine, capital_airtel, capital_mtn.
+    type : apport (extérieur -> compte), depense (compte -> extérieur),
+    decaissement (caisse -> bénéficiaire), reevaluation (correction du capital,
+    montant positif ou négatif), transfert (compte -> compte).
+    """
+    __tablename__ = "mouvements_tresorerie"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    date: Mapped[date] = mapped_column(Date)
+    type: Mapped[str] = mapped_column(String(20))
+    montant: Mapped[float] = mapped_column(Float)
+    compte_source: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    compte_dest: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    categorie: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    libelle: Mapped[str | None] = mapped_column(Text, nullable=True)
+    auteur_id: Mapped[int] = mapped_column(ForeignKey("utilisateurs.id"))
+    cree_le: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+
+
 class Parametre(Base):
     __tablename__ = "parametres"
     cle: Mapped[str] = mapped_column(String(50), primary_key=True)

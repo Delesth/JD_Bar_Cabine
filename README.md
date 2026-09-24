@@ -1,6 +1,6 @@
-# Bar & Cabine — étape 1 : socle et bar
+# Bar & Cabine — étapes 1 et 2
 
-Application Streamlit de suivi du bar (et bientôt de la cabine Airtel / MTN).
+Application Streamlit de suivi du bar et de la cabine Airtel / MTN.
 
 ## Ce que contient l'étape 1
 
@@ -14,7 +14,17 @@ Application Streamlit de suivi du bar (et bientôt de la cabine Airtel / MTN).
 - **Tableau de bord** (propriétaire) : CA, bénéfice, marge, achats, valeur du stock, réductions (total, % du CA, par motif, seuil d'alerte), CA par jour.
 - **Historique** (propriétaire) : ventes, achats, comptages, suppression, export CSV.
 
-Le gestionnaire ne voit que : Ventes du jour, Nouvel achat, Stock (sans les coûts) et Produits.
+## Ce que contient l'étape 2
+
+- **Cabine du jour** : pour Airtel et MTN, montant total et commission des crédits / recharges, dépôts et retraits. Le montant est un volume (argent des clients) ; seule la commission est du chiffre d'affaires.
+- **Dépenses** : glace, électricité, loyer, transport… rattachées à la caisse du bar ou de la cabine.
+- **Trésorerie** (propriétaire) : soldes de la caisse bar, de la caisse cabine, du capital Airtel et du capital MTN ; apports, transferts internes, réévaluation du capital après comptage, décaissements.
+- **Tableau de bord** en trois onglets : Total (CA, bénéfice, trésorerie, capital par activité), Bar, Cabine (commissions, volumes et capital par réseau).
+- **Historique** : onglets Cabine et Trésorerie, avec export CSV.
+
+Mise à jour d'une base existante : les nouvelles tables sont créées automatiquement au démarrage, sans toucher aux données déjà saisies.
+
+Le gestionnaire voit : Ventes du jour, Nouvel achat, Stock boissons, Produits, Cabine du jour et Dépenses.
 
 ## Lancer l'application sur ton ordinateur
 
