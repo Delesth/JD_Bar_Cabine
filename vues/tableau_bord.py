@@ -1,6 +1,7 @@
 """Tableau de bord du bar (propriétaire)."""
 from datetime import date, timedelta
 
+import altair as alt
 import pandas as pd
 import streamlit as st
 
@@ -68,7 +69,29 @@ def page():
                  f"refusées, à régulariser : {fcfa(ind.a_regulariser)}")
 
     if ind.ca_par_jour and (debut is None or debut != fin):
+        _graphique_ca(ind.ca_par_jour, debut, fin)
+
+
+def _graphique_ca(ca_par_jour: dict, debut, fin):
+    """Barres du CA : une par jour sur la période, ou une par mois depuis le début."""
+    if debut is None:
+        st.subheader("Chiffre d'affaires par mois")
+        par_mois = {}
+        for j, v in ca_par_jour.items():
+            cle = (j.year, j.month)
+            par_mois[cle] = par_mois.get(cle, 0) + v
+        lignes = [{"Période": f"{m:02d}/{a}", "CA": v} for (a, m), v in sorted(par_mois.items())]
+    else:
         st.subheader("Chiffre d'affaires par jour")
-        df = pd.DataFrame(sorted(ind.ca_par_jour.items()), columns=["Jour", "CA (FCFA)"])
-        df["Jour"] = pd.to_datetime(df["Jour"])
-        st.bar_chart(df, x="Jour", y="CA (FCFA)", color="#1E5A42")
+        lignes, j = [], debut
+        while j <= fin:
+            lignes.append({"Période": j.strftime("%d/%m"), "CA": ca_par_jour.get(j, 0)})
+            j += timedelta(days=1)
+    df = pd.DataFrame(lignes)
+    df["Montant"] = df["CA"].map(fcfa)
+    graphique = alt.Chart(df).mark_bar(color="#1E5A42", cornerRadiusTopLeft=3, cornerRadiusTopRight=3).encode(
+        x=alt.X("Période:N", sort=None, title=None, axis=alt.Axis(labelAngle=-45)),
+        y=alt.Y("CA:Q", title="FCFA", axis=alt.Axis(format="d")),
+        tooltip=[alt.Tooltip("Période:N", title="Date"), alt.Tooltip("Montant:N", title="CA")],
+    ).properties(height=280)
+    st.altair_chart(graphique, width="stretch")
