@@ -7,7 +7,7 @@ import streamlit as st
 from core import auth
 from core.calculs import charger, soldes
 from core.db import MouvementTresorerie, Session
-from core.format import afficher_flash, date_fr, fcfa, flash
+from core.format import afficher_flash, date_fr, fcfa, flash, gen, vider
 
 CATEGORIES = ["Glace", "Électricité", "Eau", "Loyer", "Transport", "Entretien / réparation",
               "Salaire", "Autre"]
@@ -21,20 +21,22 @@ def page():
     d = charger()
     sol = soldes(d)
 
+    g = gen("depense")
     c1, c2 = st.columns(2)
-    jour = c1.date_input("Date", value=date.today(), max_value=date.today(), format="DD/MM/YYYY")
-    act = c2.radio("Payée avec la caisse", list(ACTIVITES), format_func=ACTIVITES.get, horizontal=True)
+    jour = c1.date_input("Date", value=date.today(), max_value=date.today(), format="DD/MM/YYYY", key=f"d{g}_date")
+    act = c2.radio("Payée avec la caisse", list(ACTIVITES), format_func=ACTIVITES.get, horizontal=True,
+                   key=f"d{g}_act")
     c3, c4 = st.columns(2)
-    montant = c3.number_input("Montant (FCFA)", min_value=0, step=500, value=0)
-    cat = c4.selectbox("Catégorie", CATEGORIES)
+    montant = c3.number_input("Montant (FCFA)", min_value=0, step=500, value=0, key=f"d{g}_montant")
+    cat = c4.selectbox("Catégorie", CATEGORIES, key=f"d{g}_cat")
     precision = st.text_input("Détail" + (" (obligatoire)" if cat == "Autre" else " (facultatif)"),
-                              placeholder="Ex. 2 sacs de glace")
+                              placeholder="Ex. 2 sacs de glace", key=f"d{g}_prec")
     solde = sol[f"caisse_{act}"]
     if montant and montant > solde:
         st.warning(f"Cette dépense dépasse le solde de la caisse {ACTIVITES[act].lower()} "
                    f"({fcfa(solde)}). Vérifie le montant, ou qu'un apport a bien été enregistré.")
 
-    if st.button("Enregistrer la dépense", type="primary", width="stretch"):
+    if st.button("Enregistrer la dépense", type="primary", width="stretch", key=f"d{g}_ok"):
         if montant <= 0:
             st.error("Indique le montant.")
         elif cat == "Autre" and not precision.strip():
@@ -46,6 +48,7 @@ def page():
                                           libelle=precision.strip() or None,
                                           auteur_id=auth.utilisateur()["id"]))
                 s.commit()
+            vider("depense")
             flash(f"Dépense de {fcfa(montant)} enregistrée ({ACTIVITES[act]}).")
             st.rerun()
 

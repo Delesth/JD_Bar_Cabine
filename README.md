@@ -1,4 +1,6 @@
-# Bar & Cabine — étapes 1 et 2
+# Bar & Cabine — étapes 1 et 2 (version 2.1)
+
+© Appli développée par Grâce Delesth NGANGA
 
 Application Streamlit de suivi du bar et de la cabine Airtel / MTN.
 
@@ -24,7 +26,16 @@ Application Streamlit de suivi du bar et de la cabine Airtel / MTN.
 
 Mise à jour d'une base existante : les nouvelles tables sont créées automatiquement au démarrage, sans toucher aux données déjà saisies.
 
-Le gestionnaire voit : Ventes du jour, Nouvel achat, Stock boissons, Produits, Cabine du jour et Dépenses.
+## Ajouts (version 2.1)
+
+- **Tableau de bord du gestionnaire** : ventes, achats, réductions, bénéfice du bar, détail par produit et commissions de la cabine (sans les coûts d'achat moyens ni la trésorerie).
+- **Onglet « Par produit »** dans le tableau de bord du propriétaire.
+- **Export Excel** de la période affichée, depuis les deux tableaux de bord : synthèse, par produit, ventes, achats, cabine, dépenses (et trésorerie pour le propriétaire).
+- **Saisies vidées après enregistrement** ; les ventes du jour et la cabine du jour sont verrouillées une fois envoyées (bouton « Modifier » pour corriger).
+- **Accès perdu** : le propriétaire génère un mot de passe provisoire pour le gestionnaire (Paramètres), qui doit le changer à sa connexion. Le propriétaire réinitialise son propre accès avec le code d'installation (« Identifiant ou mot de passe oublié ? » sur la page de connexion).
+- Mention « Appli développée par Grâce Delesth NGANGA ».
+
+Le gestionnaire voit : Tableau de bord, Ventes du jour, Nouvel achat, Stock boissons, Produits, Cabine du jour et Dépenses.
 
 ## Lancer l'application sur ton ordinateur
 

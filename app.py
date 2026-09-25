@@ -7,7 +7,8 @@ import streamlit as st
 st.set_page_config(page_title="Bar & Cabine", page_icon="🥤", layout="centered")
 
 from core import auth  # noqa: E402
-from vues import (achats, cabine, depenses, historique, parametres,  # noqa: E402
+from core.format import signature  # noqa: E402
+from vues import (achats, cabine, depenses, historique, parametres, pilotage,  # noqa: E402
                   produits, stock, tableau_bord, tresorerie, validations, ventes)
 
 utilisateur = auth.exiger_connexion()
@@ -37,8 +38,11 @@ if auth.est_proprietaire():
     }
 else:
     pages = {
+        "Pilotage": [
+            st.Page(pilotage.page, title="Tableau de bord", icon="📊", url_path="tableau-de-bord", default=True),
+        ],
         "Saisie · Bar": [
-            st.Page(ventes.page, title="Ventes du jour", icon="🧾", url_path="ventes", default=True),
+            st.Page(ventes.page, title="Ventes du jour", icon="🧾", url_path="ventes"),
             st.Page(achats.page, title="Nouvel achat", icon="📦", url_path="achats"),
             st.Page(stock.page, title="Stock boissons", icon="🍺", url_path="stock"),
             st.Page(produits.page, title="Produits", icon="🏷️", url_path="produits"),
@@ -57,5 +61,7 @@ with st.sidebar:
     if st.button("Se déconnecter", width="stretch"):
         auth.deconnecter()
         st.rerun()
+    st.divider()
+    signature()
 
 st.navigation(pages).run()

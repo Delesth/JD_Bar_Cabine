@@ -219,3 +219,25 @@ def total_mouvements(d: Donnees, type_: str, debut, fin, source=None, dest=None)
                if m.type == type_ and _dans(m.date, debut, fin)
                and (source is None or m.compte_source == source)
                and (dest is None or m.compte_dest == dest))
+
+
+def par_produit(d: Donnees, r: Rejeu, debut, fin) -> list[dict]:
+    """Ventes et achats de la période, produit par produit (valeurs brutes)."""
+    lignes = []
+    for p in d.produits:
+        vendues = [v for v in d.ventes if v.produit_id == p.id and _dans(v.date, debut, fin)
+                   and v.statut != "en_attente"]
+        comptees = [v for v in vendues if v.statut == "validee"]
+        achats = [a for a in d.achats if a.produit_id == p.id and _dans(a.date, debut, fin)]
+        s = r.stock.get(p.id, {"qte": 0, "cmp": 0})
+        ca = sum(v.montant_encaisse for v in comptees)
+        cout = sum(r.cout_vente.get(v.id, 0) for v in comptees)
+        if not (vendues or achats or s["qte"]):
+            continue
+        lignes.append({
+            "produit": p, "qte_vendue": sum(v.quantite for v in vendues), "ca": ca, "cout": cout,
+            "benefice": ca - cout, "reductions": sum(v.reduction for v in comptees),
+            "qte_achetee": sum(a.unites for a in achats), "achats": sum(a.montant for a in achats),
+            "stock": s["qte"], "cmp": s["cmp"], "valeur_stock": max(s["qte"], 0) * s["cmp"],
+        })
+    return sorted(lignes, key=lambda l: -l["ca"])

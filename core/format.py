@@ -56,3 +56,21 @@ def afficher_flash() -> None:
     m = st.session_state.pop("_flash", None)
     if m:
         getattr(st, m[1])(m[0])
+
+
+# ------------------------------------------------ remise à zéro des saisies
+def gen(nom: str) -> int:
+    """Numéro de « génération » d'un espace de saisie, à inclure dans les clés des champs."""
+    return st.session_state.setdefault(f"_gen_{nom}", 0)
+
+
+def vider(nom: str) -> None:
+    """Vide un espace de saisie : ses champs reçoivent de nouvelles clés, donc reprennent leurs valeurs par défaut."""
+    st.session_state[f"_gen_{nom}"] = gen(nom) + 1
+
+
+SIGNATURE = "© Appli développée par Grâce Delesth NGANGA"
+
+
+def signature() -> None:
+    st.caption(SIGNATURE)

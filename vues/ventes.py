@@ -7,7 +7,7 @@ import streamlit as st
 from core import auth
 from core.calculs import charger, rejouer
 from core.db import Session, Vente
-from core.format import afficher_flash, date_fr, equivalent, fcfa, flash, nombre, pluriel, quantite
+from core.format import afficher_flash, date_fr, equivalent, fcfa, flash, gen, nombre, pluriel, quantite, vider
 
 MOTIFS = ["Client fidèle", "Vente en gros", "Promotion", "Geste commercial", "Autre"]
 
@@ -18,6 +18,23 @@ def _ventes_normales(d, jour, produits):
                "conditionnement complet (un casier est converti automatiquement). "
                "Enregistrer de nouveau le même jour remplace les quantités.")
     existantes = {v.produit_id: v for v in d.ventes if v.date == jour and v.type == "normal"}
+    cle_modif = f"modif_ventes_{jour.isoformat()}"
+    if existantes and not st.session_state.get(cle_modif):
+        st.success(f"Ventes du {date_fr(jour)} enregistrées. Pour éviter un double envoi, la saisie est "
+                   "verrouillée ; clique sur « Modifier » pour la corriger.")
+        recap = []
+        for p in produits:
+            v = existantes.get(p.id)
+            if v:
+                recap.append({"Produit": p.nom, "Vendu": quantite(v.quantite, p.unite_vente),
+                              "Soit": equivalent(v.quantite, p), "Recette": fcfa(v.montant_encaisse),
+                              "Saisi par": d.utilisateurs.get(v.auteur_id, "?")})
+        st.dataframe(pd.DataFrame(recap), hide_index=True, width="stretch")
+        st.metric("Recette au prix normal", fcfa(sum(v.montant_encaisse for v in existantes.values())))
+        if st.button("Modifier les ventes de ce jour", key=f"btn_{cle_modif}"):
+            st.session_state[cle_modif] = True
+            st.rerun()
+        return
     r = rejouer(d, jusqu_au=jour, sauf_ventes={v.id for v in existantes.values()})
 
     lignes = []
@@ -36,7 +53,7 @@ def _ventes_normales(d, jour, produits):
         })
     df = pd.DataFrame(lignes)
     edite = st.data_editor(
-        df, key=f"ventes_{jour.isoformat()}", hide_index=True, width="stretch",
+        df, key=f"ventes_{jour.isoformat()}_{gen('ventes')}", hide_index=True, width="stretch",
         disabled=["Produit", "En stock", "Conditionnement", "Prix unitaire"],
         column_order=["Produit", "En stock", "Vendu à l'unité", "Vendu en conditionnement",
                       "Conditionnement", "Prix unitaire"],
@@ -65,8 +82,12 @@ def _ventes_normales(d, jour, produits):
         st.warning("Ces ventes dépassent le stock disponible. Vérifie qu'il ne s'agit pas d'une "
                    "erreur de saisie (40 au lieu de 4) ou d'un achat non enregistré :\n\n- "
                    + "\n- ".join(depassements))
-        confirme = st.checkbox("Je confirme ces quantités", key=f"conf_{jour}")
+        confirme = st.checkbox("Je confirme ces quantités", key=f"conf_{jour}_{gen('ventes')}")
 
+    if existantes and st.button("Annuler la modification", key=f"annul_{cle_modif}"):
+        st.session_state.pop(cle_modif, None)
+        vider("ventes")
+        st.rerun()
     if st.button(f"Enregistrer les ventes du {date_fr(jour)}", type="primary",
                  disabled=not confirme, width="stretch"):
         uid = auth.utilisateur()["id"]
@@ -82,6 +103,8 @@ def _ventes_normales(d, jour, produits):
                 elif v:
                     s.delete(s.get(Vente, v.id))
             s.commit()
+        st.session_state.pop(cle_modif, None)
+        vider("ventes")
         flash(f"Ventes du {date_fr(jour)} enregistrées.")
         st.rerun()
 
@@ -90,24 +113,25 @@ def _vente_speciale(d, jour, produits):
     st.subheader("2. Ventes à tarif réduit")
     st.caption("Une ligne par réduction accordée, avec le prix réellement encaissé et le motif.")
     r = rejouer(d, jusqu_au=jour)
+    g = gen("reduction")
     c1, c2 = st.columns(2)
-    p = c1.selectbox("Produit", produits, format_func=lambda x: x.nom, key="red_prod")
+    p = c1.selectbox("Produit", produits, format_func=lambda x: x.nom, key=f"r{g}_prod")
     unites_possibles = [p.unite_vente]
     if p.conditionnement != "unité" and p.unites_par_cond > 1:
         unites_possibles.append(p.conditionnement)
     u = c2.selectbox("Vendu en", unites_possibles,
                      format_func=lambda x: x if x == p.unite_vente else f"{x} de {p.unites_par_cond}",
-                     key=f"red_unite_{p.id}")
+                     key=f"r{g}_unite_{p.id}")
     c3, c4 = st.columns(2)
-    nb = c3.number_input(f"Nombre de {pluriel(u)}", min_value=0, step=1, value=0, key=f"red_nb_{p.id}_{u}")
+    nb = c3.number_input(f"Nombre de {pluriel(u)}", min_value=0, step=1, value=0, key=f"r{g}_nb_{p.id}_{u}")
     q = nb * (p.unites_par_cond if u != p.unite_vente else 1)
     normal = q * p.prix_vente
     encaisse = c4.number_input("Montant total encaissé (FCFA)", min_value=0, step=100,
-                               value=int(normal), key=f"red_enc_{p.id}_{u}_{nb}")
+                               value=int(normal), key=f"r{g}_enc_{p.id}_{u}_{nb}")
     c5, c6 = st.columns(2)
-    motif = c5.selectbox("Motif", MOTIFS, key="red_motif")
+    motif = c5.selectbox("Motif", MOTIFS, key=f"r{g}_motif")
     precision = c6.text_input("Précision" + (" (obligatoire)" if motif == "Autre" else " (facultatif)"),
-                              key="red_prec")
+                              key=f"r{g}_prec")
 
     cmp = r.stock.get(p.id, {}).get("cmp", 0)
     cout = q * cmp
@@ -136,7 +160,7 @@ def _vente_speciale(d, jour, produits):
     else:
         libelle = "Enregistrer la vente à tarif réduit"
 
-    if st.button(libelle, type="primary", width="stretch", key="red_ok"):
+    if st.button(libelle, type="primary", width="stretch", key=f"r{g}_ok"):
         if q <= 0:
             st.error("Indique la quantité vendue.")
         elif reduction <= 0 and not perte:
@@ -152,6 +176,7 @@ def _vente_speciale(d, jour, produits):
                             statut="en_attente" if perte else "validee",
                             cout_unitaire_saisie=float(cmp), auteur_id=auth.utilisateur()["id"]))
                 s.commit()
+            vider("reduction")
             flash("Vente à perte soumise : elle apparaîtra dans la page « À valider » du propriétaire."
                   if perte else "Vente à tarif réduit enregistrée.", "warning" if perte else "success")
             st.rerun()

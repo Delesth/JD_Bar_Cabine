@@ -7,7 +7,7 @@ import streamlit as st
 from core import auth
 from core.calculs import OPERATEURS, TYPES_CABINE, charger, indicateurs_cabine, soldes
 from core.db import OperationCabine, Session
-from core.format import afficher_flash, date_fr, fcfa, flash
+from core.format import afficher_flash, date_fr, fcfa, flash, gen, vider
 
 
 def page():
@@ -21,13 +21,34 @@ def page():
     op = st.radio("Réseau", list(OPERATEURS), format_func=OPERATEURS.get, horizontal=True)
 
     existantes = {o.type: o for o in d.operations if o.date == jour and o.operateur == op}
+    cle_modif = f"modif_cab_{jour.isoformat()}_{op}"
+    if existantes and not st.session_state.get(cle_modif):
+        _recap_verrouille(d, jour, op, existantes, cle_modif)
+    else:
+        _saisie(jour, op, existantes, cle_modif)
+    _resume(d, jour)
+
+
+def _recap_verrouille(d, jour, op, existantes, cle_modif):
+    st.success(f"{OPERATEURS[op]} du {date_fr(jour)} enregistré. La saisie est verrouillée pour éviter "
+               "un double envoi ; clique sur « Modifier » pour la corriger.")
+    st.dataframe(pd.DataFrame([{
+        "Opération": TYPES_CABINE[t], "Montant total": fcfa(o.montant), "Commission": fcfa(o.commission),
+        "Saisi par": d.utilisateurs.get(o.auteur_id, "?"),
+    } for t, o in existantes.items()]), hide_index=True, width="stretch")
+    if st.button(f"Modifier {OPERATEURS[op]} du {date_fr(jour)}", key=f"btn_{cle_modif}"):
+        st.session_state[cle_modif] = True
+        st.rerun()
+
+
+def _saisie(jour, op, existantes, cle_modif):
     df = pd.DataFrame([{
         "type": k, "Opération": lib,
         "Montant total (FCFA)": int(existantes[k].montant) if k in existantes else 0,
         "Commission (FCFA)": int(existantes[k].commission) if k in existantes else 0,
     } for k, lib in TYPES_CABINE.items()])
     edite = st.data_editor(
-        df, key=f"cab_{jour.isoformat()}_{op}", hide_index=True, width="stretch",
+        df, key=f"cab_{jour.isoformat()}_{op}_{gen('cabine')}", hide_index=True, width="stretch",
         disabled=["Opération"], column_order=["Opération", "Montant total (FCFA)", "Commission (FCFA)"],
         column_config={
             "Montant total (FCFA)": st.column_config.NumberColumn(min_value=0, step=500, format="%d"),
@@ -47,7 +68,11 @@ def page():
     if suspectes:
         st.warning("La commission est supérieure au montant des opérations pour : "
                    + ", ".join(suspectes) + ". Vérifie qu'il n'y a pas d'inversion entre les deux colonnes.")
-        confirme = st.checkbox("Je confirme ces montants", key=f"cab_conf_{jour}_{op}")
+        confirme = st.checkbox("Je confirme ces montants", key=f"cab_conf_{jour}_{op}_{gen('cabine')}")
+    if existantes and st.button("Annuler la modification", key=f"annul_{cle_modif}"):
+        st.session_state.pop(cle_modif, None)
+        vider("cabine")
+        st.rerun()
 
     if st.button(f"Enregistrer {OPERATEURS[op]} du {date_fr(jour)}", type="primary",
                  disabled=not confirme, width="stretch"):
@@ -63,9 +88,13 @@ def page():
                 elif o:
                     s.delete(s.get(OperationCabine, o.id))
             s.commit()
-        flash(f"{OPERATEURS[op]} du {date_fr(jour)} enregistré. Enregistrer de nouveau remplace les montants.")
+        st.session_state.pop(cle_modif, None)
+        vider("cabine")
+        flash(f"{OPERATEURS[op]} du {date_fr(jour)} enregistré.")
         st.rerun()
 
+
+def _resume(d, jour):
     st.divider()
     st.subheader(f"Résumé du {date_fr(jour)}")
     ind = indicateurs_cabine(d, jour, jour)

@@ -6,9 +6,10 @@ import pandas as pd
 import streamlit as st
 
 from core.calculs import (OPERATEURS, TYPES_CABINE, charger, indicateurs, indicateurs_cabine,
-                          rejouer, soldes, total_mouvements)
+                          par_produit, rejouer, soldes, total_mouvements)
+from core.export import excel_tableau_de_bord, nom_fichier
 from core.db import lire_parametre
-from core.format import fcfa, nombre
+from core.format import fcfa, nombre, quantite
 
 VERT, AIRTEL, MTN = "#1E5A42", "#D7262E", "#E3B100"
 
@@ -183,11 +184,38 @@ def page():
     sol = soldes(d)
     if tous.en_attente:
         st.error(f"{tous.en_attente} vente(s) à perte attendent ta décision dans la page « À valider ».")
+    bouton_excel(d, debut, fin, proprietaire=True)
 
-    t_total, t_bar, t_cab = st.tabs(["Total", "Bar", "Cabine"])
+    t_total, t_bar, t_prod, t_cab = st.tabs(["Total", "Bar", "Par produit", "Cabine"])
     with t_total:
         _vue_totale(d, r, ind_bar, ind_cab, dep_bar, sol, debut, fin)
     with t_bar:
         _vue_bar(d, r, ind_bar, dep_bar, tous, debut, fin)
+    with t_prod:
+        tableau_par_produit(d, r, debut, fin, proprietaire=True)
     with t_cab:
         _vue_cabine(d, ind_cab, sol, debut, fin)
+
+
+def tableau_par_produit(d, r, debut, fin, proprietaire: bool):
+    lignes = par_produit(d, r, debut, fin)
+    if not lignes:
+        st.caption("Aucune vente ni aucun achat sur la période.")
+        return
+    rows = []
+    for l in lignes:
+        p = l["produit"]
+        row = {"Produit": p.nom, "Vendu": quantite(l["qte_vendue"], p.unite_vente), "CA": fcfa(l["ca"]),
+               "Bénéfice": fcfa(l["benefice"]), "Acheté": quantite(l["qte_achetee"], p.unite_vente),
+               "Achats": fcfa(l["achats"]), "Stock actuel": quantite(l["stock"], p.unite_vente)}
+        if proprietaire:
+            row["Valeur du stock"] = fcfa(l["valeur_stock"])
+        rows.append(row)
+    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+
+
+def bouton_excel(d, debut, fin, proprietaire: bool):
+    st.download_button("⬇️ Télécharger en Excel (période affichée)",
+                       data=excel_tableau_de_bord(d, debut, fin, proprietaire),
+                       file_name=nom_fichier(debut, fin),
+                       mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")

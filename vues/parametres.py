@@ -42,8 +42,30 @@ def page():
                         g.mot_de_passe = auth.hacher(mdp)
                     s.add(g)
                     s.commit()
-                    flash("Compte du gestionnaire enregistré. Transmets-lui son identifiant et son mot de passe.")
+                    if mdp:
+                        auth.marquer_provisoire(g.id)
+                    flash("Compte du gestionnaire enregistré. Transmets-lui son identifiant et son mot de passe : "
+                          "il devra le remplacer par le sien à sa première connexion.")
                     st.rerun()
+
+    if gest:
+        with st.container(border=True):
+            st.markdown("**Mot de passe ou identifiant oublié par le gestionnaire**")
+            st.caption("Génère un mot de passe provisoire à lui transmettre (par téléphone ou message). "
+                       "À sa connexion, il devra choisir un nouveau mot de passe personnel.")
+            if st.button("Générer un mot de passe provisoire"):
+                provisoire = auth.generer_mot_de_passe()
+                with Session() as s:
+                    g = s.get(Utilisateur, gest.id)
+                    g.mot_de_passe, g.actif = auth.hacher(provisoire), True
+                    s.commit()
+                auth.marquer_provisoire(gest.id)
+                st.session_state["_provisoire"] = (gest.identifiant, provisoire)
+            if "_provisoire" in st.session_state:
+                ident, provisoire = st.session_state.pop("_provisoire")
+                st.success(f"À transmettre au gestionnaire : identifiant **{ident}** · "
+                           f"mot de passe provisoire **{provisoire}**")
+                st.caption("Note-le maintenant : il ne sera plus affiché.")
 
     st.subheader("Réglages")
     seuil = st.number_input("Seuil d'alerte des réductions (% du chiffre d'affaires mensuel)",

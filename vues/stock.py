@@ -7,7 +7,7 @@ import streamlit as st
 from core import auth
 from core.calculs import charger, rejouer
 from core.db import AjustementStock, Session
-from core.format import afficher_flash, date_fr, equivalent, fcfa, flash, quantite
+from core.format import afficher_flash, date_fr, equivalent, fcfa, flash, gen, quantite, vider
 
 
 def page():
@@ -51,12 +51,13 @@ def page():
                         "Stock calculé": r.stock.get(p.id, {}).get("qte", 0),
                         "Quantité comptée": None} for p in produits])
     edite = st.data_editor(
-        df, key="comptage", hide_index=True, width="stretch",
+        df, key=f"comptage_{gen('comptage')}", hide_index=True, width="stretch",
         disabled=["Produit", "Stock calculé"], column_order=["Produit", "Stock calculé", "Quantité comptée"],
         column_config={"Stock calculé": st.column_config.NumberColumn(format="%g"),
                        "Quantité comptée": st.column_config.NumberColumn(min_value=0, step=1, format="%d")},
     )
-    motif = st.text_input("Explication des écarts (facultatif)", placeholder="2 bouteilles cassées à la livraison")
+    motif = st.text_input("Explication des écarts (facultatif)", placeholder="2 bouteilles cassées à la livraison",
+                          key=f"comptage_motif_{gen('comptage')}")
     ecarts = []
     for _, l in edite.iterrows():
         if pd.notna(l["Quantité comptée"]) and float(l["Quantité comptée"]) != float(l["Stock calculé"]):
@@ -77,7 +78,7 @@ def page():
                                       quantite_comptee=compte, motif=motif.strip() or None,
                                       auteur_id=auth.utilisateur()["id"]))
             s.commit()
-        st.session_state.pop("comptage", None)
+        vider("comptage")
         flash(f"Comptage enregistré : {len(ecarts)} écart(s) pris en compte.")
         st.rerun()
 

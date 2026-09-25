@@ -7,7 +7,7 @@ import streamlit as st
 from core import auth
 from core.calculs import COMPTES, charger, soldes
 from core.db import MouvementTresorerie, Session
-from core.format import afficher_flash, date_fr, fcfa, flash
+from core.format import afficher_flash, date_fr, fcfa, flash, gen, vider
 
 TYPES = {"apport": "Apport", "depense": "Dépense", "decaissement": "Décaissement",
          "reevaluation": "Réévaluation du capital", "transfert": "Transfert interne"}
@@ -88,13 +88,14 @@ def page():
         r1, r2 = st.columns(2)
         cap = r1.selectbox("Capital", ["capital_airtel", "capital_mtn"], format_func=COMPTES.get)
         compte = r2.number_input("Montant compté (FCFA)", min_value=0, step=1000, value=int(max(sol[cap], 0)),
-                                 key=f"reev_{cap}")
+                                 key=f"reev_{cap}_{gen('reev')}")
         ecart = compte - sol[cap]
         st.metric("Écart avec le capital enregistré", fcfa(ecart))
-        note = st.text_input("Explication", key="reev_note", placeholder="Comptage du 30/09")
+        note = st.text_input("Explication", key=f"reev_note_{gen('reev')}", placeholder="Comptage du 30/09")
         if st.button("Enregistrer la réévaluation", type="primary", disabled=ecart == 0):
             _enregistrer(date=date.today(), type="reevaluation", montant=float(ecart), compte_dest=cap,
                          libelle=note.strip() or None)
+            vider("reev")
             flash(f"{COMPTES[cap]} réévalué à {fcfa(compte)}.")
             st.rerun()
 
