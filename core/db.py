@@ -168,14 +168,27 @@ def _adresse_base() -> str:
 
 @st.cache_resource
 def _moteur():
-    moteur = create_engine(_adresse_base(), pool_pre_ping=True)
-    Base.metadata.create_all(moteur)
-    return moteur
+    return create_engine(_adresse_base(), pool_pre_ping=True)
+
+
+@st.cache_resource
+def _tables_pretes(_moteur, noms_tables: tuple) -> bool:
+    """Crée les tables manquantes.
+
+    Le résultat est mémorisé pour la liste de tables donnée : quand une mise à jour
+    ajoute une table, la liste change et la création est relancée automatiquement,
+    sans redémarrer l'application. Les tables existantes et leurs données ne sont
+    jamais modifiées.
+    """
+    Base.metadata.create_all(_moteur)
+    return True
 
 
 def Session():
     """Ouvre une session : `with Session() as s: ...`"""
-    return sessionmaker(bind=_moteur(), expire_on_commit=False)()
+    moteur = _moteur()
+    _tables_pretes(moteur, tuple(sorted(Base.metadata.tables)))
+    return sessionmaker(bind=moteur, expire_on_commit=False)()
 
 
 def est_locale() -> bool:
