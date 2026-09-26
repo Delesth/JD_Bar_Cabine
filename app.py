@@ -4,13 +4,16 @@ Lancer :  streamlit run app.py
 """
 import streamlit as st
 
-st.set_page_config(page_title="Bar & Cabine", page_icon="🥤", layout="centered")
+st.set_page_config(page_title="JD Bar et Cabine", page_icon="🥤", layout="centered")
 
 from core import auth  # noqa: E402
 from core.format import signature  # noqa: E402
 from vues import (achats, cabine, depenses, historique, parametres, pilotage,  # noqa: E402
                   produits, stock, tableau_bord, tresorerie, validations, ventes)
 
+from core.db import verifier_configuration  # noqa: E402
+
+verifier_configuration()
 utilisateur = auth.exiger_connexion()
 
 if auth.est_proprietaire():
