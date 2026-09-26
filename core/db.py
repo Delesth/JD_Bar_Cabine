@@ -195,6 +195,30 @@ def est_locale() -> bool:
     return _adresse_base().startswith("sqlite")
 
 
+def en_ligne() -> bool:
+    """Vrai quand l'application tourne sur Streamlit Community Cloud."""
+    return os.path.isdir("/mount/src")
+
+
+def verifier_configuration() -> None:
+    """Bloque l'application en ligne si la base Supabase n'est pas configurée.
+
+    Sans cette vérification, l'application utiliserait en silence une base locale
+    temporaire, effacée à chaque redémarrage : toutes les saisies seraient perdues.
+    """
+    if not (en_ligne() and est_locale()):
+        return
+    st.title("Configuration incomplète")
+    st.error("L'application ne trouve pas l'adresse de la base de données (DATABASE_URL) dans ses Secrets. "
+             "Aucune saisie n'est possible tant que ce n'est pas corrigé, pour éviter de perdre des données.")
+    st.markdown(
+        "**Propriétaire** : dans « Gérer l'application » → ⋮ → Settings → Secrets, vérifie que tu as bien :\n\n"
+        "```\nDATABASE_URL = \"postgresql://...\"\nCODE_INSTALLATION = \"...\"\n```\n\n"
+        "Noms en majuscules, valeurs entre guillemets droits, puis « Save ».\n\n"
+        "**Gestionnaire** : note les chiffres du jour sur le cahier de caisse et préviens le propriétaire.")
+    st.stop()
+
+
 PARAMETRES_DEFAUT = {"seuil_reductions_pct": "5"}
 
 
