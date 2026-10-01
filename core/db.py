@@ -161,8 +161,11 @@ def _adresse_base() -> str:
     except Exception:
         url = None
     url = url or os.environ.get("DATABASE_URL") or "sqlite:///barcabine.db"
-    if url.startswith("postgres://"):
-        url = "postgresql://" + url[len("postgres://"):]
+    # Pilote PostgreSQL indiqué explicitement : les versions récentes de SQLAlchemy
+    # utilisent par défaut un autre pilote (psycopg 3), absent de l'installation.
+    for prefixe in ("postgres://", "postgresql://"):
+        if url.startswith(prefixe):
+            url = "postgresql+psycopg2://" + url[len(prefixe):]
     return url
 
 
